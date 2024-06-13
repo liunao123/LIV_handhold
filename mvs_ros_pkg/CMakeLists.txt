@@ -33,35 +33,13 @@ link_directories(
   /opt/MVS/lib/64
 )
 
-add_executable(grabImg src/grab.cpp)
-add_executable(grabImgWithTrigger src/grab_trigger.cpp)
-add_executable(Trigger_Image src/Trigger_Image.cpp)
-
+add_executable(mvs_camera_trigger src/grab_trigger.cpp)
 target_link_libraries(
-  grabImg
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBS}
-  -lMvCameraControl
-  -lpthread
-)
-target_link_libraries(
-  grabImgWithTrigger
+  mvs_camera_trigger
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS}
   -lMvCameraControl
   -lpthread
 )
 
-target_link_libraries(
-  Trigger_Image
-  ${catkin_LIBRARIES}
-  ${OpenCV_LIBS}
-  -lMvCameraControl
-  -lpthread
-)
-
-add_executable(parse_type_time src/parse_type.cpp)
-target_link_libraries(parse_type_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-
-add_executable(parse_topic_time src/parse_topic.cpp)
-target_link_libraries(parse_topic_time ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+# sdk: MVS-2.1.1_x86_64_20220511.deb

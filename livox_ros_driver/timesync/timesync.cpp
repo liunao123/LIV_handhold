@@ -145,7 +145,7 @@ void TimeSync::PollDataLoop() {
               if ((strstr((const char *)packet.data, "$GPRMC")) ||
                       (strstr((const char *)packet.data , "$GNRMC"))){
                         // 这里把包的结果打印出来了
-                // printf((const char *)packet.data);
+                //printf((const char *)packet.data);
                 fn_cb_((const char *)packet.data,
                        packet.data_len, client_data_);
                 // printf((const char *)client_data_);
@@ -196,7 +196,7 @@ void TimeSync::FsmCheckDevState() {
   chrono::milliseconds time_gap =
       chrono::duration_cast<chrono::milliseconds>(t2 - t1);
 
-  if (time_gap.count() > 2000000) { /* period : 2.5s */
+  if (time_gap.count() > 2000) { /* period : 2.5s */
     if (last_rx_bytes == rx_bytes_) {
       uart_->Close();
       FsmTransferState(kOpenDev);

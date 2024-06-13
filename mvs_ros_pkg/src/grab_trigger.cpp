@@ -8,7 +8,7 @@
 #include <ros/ros.h>
 #include <stdio.h>
 #include <unistd.h>
-
+#include <signal.h>
 #include <fcntl.h>
 #include <sys/ipc.h>
 #include <sys/mman.h>
@@ -54,7 +54,25 @@ void setParams(void *handle, const std::string &params_file) {
 
   int CenterAlign = Params["CenterAlign"];
 
+
+        int Binning = Params["Binning"];
+        printf("Binning : %d .\n", Binning);
+
   int nRet;
+
+        nRet = MV_CC_SetEnumValue(handle, "BinningHorizontal", Binning);
+        if (MV_OK != nRet)
+            ROS_WARN("set BinningHorizontal fail! nRet [%x]\n", nRet);
+        else
+            ROS_WARN("set BinningHorizontal ok! nRet [%x]\n", nRet);
+
+        nRet = MV_CC_SetEnumValue(handle, "BinningVertical", Binning);
+        if (MV_OK != nRet)
+            ROS_WARN("set BinningVertical fail! nRet [%x]\n", nRet);
+        else
+            ROS_WARN("set BinningVertical ok! nRet [%x]\n", nRet);
+
+
   if (CenterAlign) { //这里开始 设置中心对齐
     // Strobe输出
     nRet = MV_CC_SetEnumValue(handle, "LineSelector", 2);
@@ -191,10 +209,7 @@ void setParams(void *handle, const std::string &params_file) {
 
 void PressEnterToExit(void) {
   int c;
-  while ((c = getchar()) != '\n' && c != EOF)
-    ;
-  fprintf(stderr, "\nPress enter to exit.\n");
-  while (getchar() != '\n')
+  while (ros::ok())
     ;
   exit_flag = true;
   sleep(1);
@@ -224,9 +239,12 @@ static void *WorkThread(void *pUser) {
   unsigned int nDataSize = stParam.nCurValue;
 
   while (ros::ok()) {
-
+    auto st = ros::Time::now();
     nRet =
-        MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 1000);
+        MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 100);
+auto et = ros::Time::now();
+ROS_WARN_ONCE("use time : %lf", (et - st).toSec() );
+
     if (nRet == MV_OK) {
       auto time_pc_clk = std::chrono::high_resolution_clock::now();
       // double time_pc =
@@ -246,7 +264,7 @@ static void *WorkThread(void *pUser) {
       debug_msg = CameraName + " GetOneFrame,nFrameNum[" +
                   std::to_string(stImageInfo.nFrameNum) + "], FrameTime:" +
                   std::to_string(rcv_time.toSec());
-      // ROS_INFO_STREAM(debug_msg.c_str());
+      ROS_WARN_ONCE(debug_msg.c_str());
       cv::Mat srcImage;
       srcImage =
           cv::Mat(stImageInfo.nHeight, stImageInfo.nWidth, CV_8UC3, pData);
@@ -259,7 +277,9 @@ static void *WorkThread(void *pUser) {
       sensor_msgs::ImagePtr msg =
           cv_bridge::CvImage(std_msgs::Header(), "rgb8", srcImage).toImageMsg();
       msg->header.stamp = rcv_time;
+      msg->header.frame_id = "camera";
       pub.publish(msg);
+      // ROS_WARN("camera use time : %lf", msg->header.stamp.toSec());
     }
 
     if (exit_flag)
@@ -274,7 +294,50 @@ static void *WorkThread(void *pUser) {
   return 0;
 }
 
-int main(int argc, char **argv) {
+bool PrintDeviceInfo(MV_CC_DEVICE_INFO* pstMVDevInfo)
+{
+    if (NULL == pstMVDevInfo)
+    {
+        printf("The Pointer of pstMVDevInfo is NULL!\n");
+        return false;
+    }
+    if (pstMVDevInfo->nTLayerType == MV_GIGE_DEVICE)
+    {
+        int nIp1 = ((pstMVDevInfo->SpecialInfo.stGigEInfo.nCurrentIp & 0xff000000) >> 24);
+        int nIp2 = ((pstMVDevInfo->SpecialInfo.stGigEInfo.nCurrentIp & 0x00ff0000) >> 16);
+        int nIp3 = ((pstMVDevInfo->SpecialInfo.stGigEInfo.nCurrentIp & 0x0000ff00) >> 8);
+        int nIp4 = (pstMVDevInfo->SpecialInfo.stGigEInfo.nCurrentIp & 0x000000ff);
+
+        // ch:打印当前相机ip和用户自定义名字 | en:print current ip and user defined name
+        printf("Device Model Name: %s\n", pstMVDevInfo->SpecialInfo.stGigEInfo.chModelName);
+        printf("CurrentIp: %d.%d.%d.%d\n" , nIp1, nIp2, nIp3, nIp4);
+        printf("UserDefinedName: %s\n\n" , pstMVDevInfo->SpecialInfo.stGigEInfo.chUserDefinedName);
+    }
+    else if (pstMVDevInfo->nTLayerType == MV_USB_DEVICE)
+    {
+        printf("Device Model Name: %s\n", pstMVDevInfo->SpecialInfo.stUsb3VInfo.chModelName);
+        printf("UserDefinedName: %s\n\n", pstMVDevInfo->SpecialInfo.stUsb3VInfo.chUserDefinedName);
+    }
+    else
+    {
+        printf("Not support.\n");
+    }
+
+    return true;
+}
+
+void signal_callback_handler(int signum)
+{
+  cout << "Caught signal, EXIT mvs_trigger . " << signum << endl;
+  // Terminate program
+  exit_flag = true;
+  exit(signum);
+
+}
+
+int main(int argc, char **argv)
+{
+  signal(SIGINT, signal_callback_handler);
 
   ros::init(argc, argv, "mvs_trigger");
   std::string params_file = std::string(argv[1]);
@@ -322,14 +385,18 @@ int main(int argc, char **argv) {
     } else {
       // 根据serial number启动指定相机
       for (int i = 0; i < stDeviceList.nDeviceNum; i++) {
+        PrintDeviceInfo(stDeviceList.pDeviceInfo[i]);
+
         std::string serial_number =
             std::string((char *)stDeviceList.pDeviceInfo[i]
                             ->SpecialInfo.stUsb3VInfo.chSerialNumber);
-        if (expect_serial_number == serial_number) {
+ROS_WARN("serial_number: %s.\n", serial_number.c_str());
+
+       // if (expect_serial_number == serial_number) {
           find_expect_camera = true;
           expect_camera_index = i;
-          break;
-        }
+         // break;
+        //}
       }
     }
     if (!find_expect_camera) {

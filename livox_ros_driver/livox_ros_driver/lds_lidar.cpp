@@ -537,6 +537,7 @@ void LdsLidar::SetRmcSyncTimeCb(livox_status status, uint8_t handle,
 // 这是GRMS 的回调函数
 void LdsLidar::ReceiveSyncTimeCallback(const char *rmc, uint32_t rmc_length,
                                        void *client_data) {
+
   LdsLidar *lds_lidar = static_cast<LdsLidar *>(client_data);
   // std::unique_lock<std::mutex> lock(mtx);
   LidarDevice *p_lidar = nullptr;
@@ -544,6 +545,31 @@ void LdsLidar::ReceiveSyncTimeCallback(const char *rmc, uint32_t rmc_length,
     p_lidar = &(lds_lidar->lidars_[handle]);
     if (p_lidar->connect_state == kConnectStateSampling &&
         p_lidar->info.state == kLidarStateNormal) {
+
+  const int rmc_size = 80;
+  printf("strlen(rmc):%d <greater than 80 , mean uart warning .>\n", strlen(rmc));
+
+if(strlen(rmc) >= rmc_size )
+{
+  const char *rmc_begin = strstr(rmc, "$GPRMC");
+  char temp[rmc_size];
+  strncpy(temp , rmc_begin, rmc_size-1 );
+  temp[rmc_size-1] = '\0';
+  //printf("temp79: %s \n", temp);
+     
+  const char *rmc_as = strstr(temp, "A*");
+  if(rmc_as == NULL) { return ; }
+
+      // LidarSetRmcSyncTime是SDK的函数
+      livox_status status = LidarSetRmcSyncTime(handle, temp, strlen(temp),
+                                                SetRmcSyncTimeCb, lds_lidar);
+      // status=-1
+      if (status != kStatusSuccess) {
+        printf("Set GPRMC synchronization time error code: %d.\n", status);
+      }
+}
+
+/*
       // LidarSetRmcSyncTime是SDK的函数
       livox_status status = LidarSetRmcSyncTime(handle, rmc, rmc_length,
                                                 SetRmcSyncTimeCb, lds_lidar);
@@ -551,6 +577,9 @@ void LdsLidar::ReceiveSyncTimeCallback(const char *rmc, uint32_t rmc_length,
       if (status != kStatusSuccess) {
         printf("Set GPRMC synchronization time error code: %d.\n", status);
       }
+*/
+
+
     }
   }
 }

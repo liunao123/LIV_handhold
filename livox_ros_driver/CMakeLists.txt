@@ -2,7 +2,7 @@
 
 cmake_minimum_required(VERSION 3.0)
 
-set(PYTHON_EXECUTABLE /usr/bin/python3)
+set(PYTHON_EXECUTABLE /usr/bin/python)
 #---------------------------------------------------------------------------------------
 # Start livox_ros_driver project
 #---------------------------------------------------------------------------------------

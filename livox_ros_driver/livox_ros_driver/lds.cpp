@@ -110,6 +110,13 @@ uint64_t GetStoragePacketTimestamp(StoragePacket *packet, uint8_t data_src) {
   LdsStamp timestamp;
   memcpy(timestamp.stamp_bytes, raw_packet->timestamp, sizeof(timestamp));
 
+static int cnts = 0;
+if(cnts++ > 2500)
+{
+cnts = 0;
+printf("lds.cpp117: Timestamp type[%d].\n", raw_packet->timestamp_type);
+}
+
   if (raw_packet->timestamp_type == kTimestampTypePps) {
     // double a1 = timestamp.stamp / 1e9;
     // double a2 = packet->time_rcv / 1e9;
@@ -129,13 +136,17 @@ uint64_t GetStoragePacketTimestamp(StoragePacket *packet, uint8_t data_src) {
     //
     time_utc.tm_isdst = 0;
     time_utc.tm_year = raw_packet->timestamp[0] + 100;  // map 2000 to 1990
-    // time_utc.tm_mon = raw_packet->timestamp[1] - 1;     // map 1~12 to 0~11
-    // time_utc.tm_mday = raw_packet->timestamp[2];
-    // time_utc.tm_hour = raw_packet->timestamp[3];
+    time_utc.tm_mon = raw_packet->timestamp[1] - 1;     // map 1~12 to 0~11
+     time_utc.tm_mday = raw_packet->timestamp[2];
+     time_utc.tm_hour = raw_packet->timestamp[3];
+
+
     // time_utc.tm_year = 2000; // map 2000 to 1990
-    time_utc.tm_mon = 0;  // map 1~12 to 0~11
-    time_utc.tm_mday =1;
-    time_utc.tm_hour = 0;
+    //time_utc.tm_mon = 0;  // map 1~12 to 0~11
+   // time_utc.tm_mday =1;
+   // time_utc.tm_hour = 0;
+
+
     time_utc.tm_min = 0;
     time_utc.tm_sec = 0;
 

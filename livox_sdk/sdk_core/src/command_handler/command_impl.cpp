@@ -154,9 +154,10 @@ bool ParseRmcTime(const char *rmc, uint16_t rmc_len,
     // return false;
   }
   // 校验一下
-  // if (!ChecksumRmc(rmc_begin, rmc + rmc_len)) {
-  //   return false;
-  // }
+   if (!ChecksumRmc(rmc_begin, rmc + rmc_len)) {
+     printf("ChecksumRmc failed -_-");
+     return false;
+   }
 
   char utc_hms_buff[HMS_PARSE_BUF] = {0};
   char utc_yy_buff[YY_PARSE_BUF] = {0};
@@ -171,9 +172,21 @@ bool ParseRmcTime(const char *rmc, uint16_t rmc_len,
          &utc_yy_buff[0]);
 
   sscanf(utc_hms_buff, "%2d%2d%2d", &hour, &minute, &second);
-  sscanf(utc_yy_buff, "%*C%*C%2hhu", &(utc_time_req->year));
-  printf("year:%d,month:%d,day:%d,h,m,s:%d,%d,%d\n", utc_time_req->year,
-         utc_time_req->month, utc_time_req->day, hour, minute, second);
+
+  //sscanf(utc_yy_buff, "%*C%*C%2hhu", &(utc_time_req->year));
+  //printf("\nutc_yy_buff %c %c\n", utc_yy_buff[0], utc_yy_buff[1]);
+  int ytemp = atoi(utc_yy_buff);
+ // printf("\n ytemp %d\n", ytemp );
+
+  // ok too
+  //int ytemp_1 = 10* (utc_yy_buff[0] - 0x30) + (utc_yy_buff[1] - 0x30);
+  //printf("\n ytemp_1 %d\n", ytemp_1 );
+
+  utc_time_req->year = ytemp;
+
+ // printf("year:%d,month:%d,day:%d,h,m,s:%d,%d,%d\n", utc_time_req->year,utc_time_req->month, utc_time_req->day, hour, minute, second);
+
+
   // utc_time_req->year = 0;
   // utc_time_req->month = 0;
   // utc_time_req->day = 0;
@@ -889,17 +902,22 @@ livox_status HubGetImuPushFrequency(HubGetImuPushFrequencyRequest *req,
 livox_status LidarSetUtcSyncTime(uint8_t handle,
                                  LidarSetUtcSyncTimeRequest *req,
                                  CommonCommandCallback cb, void *client_data) {
+
+  printf("\nyear:%d,month:%d,day:%d,h:%d,ms:%d\n", req->year,
+         req->month, req->day, req->hour,   req->microsecond);
+
   livox_status result = command_handler().SendCommand(
       handle, kCommandSetLidar, kCommandIDLidarSetSyncTime, (uint8_t *)req,
       sizeof(*req), MakeCommandCallback<uint8_t>(cb, client_data));
-  printf("LidarSetUtcSyncTime Failure:%d\n", result);
+  printf("\nLidarSetUtcSyncTime Failure:%d\n", result);
   return result;
 }
 
 livox_status LidarSetRmcSyncTime(uint8_t handle, const char *rmc,
                                  uint16_t rmc_length, CommonCommandCallback cb,
                                  void *client_data) {
-  printf("check!");
+//  printf("check!\n");
+  printf("check! rmc: %s\n", rmc);
   if (device_manager().device_mode() != kDeviceModeLidar) {
     return kStatusNotSupported;
   }
