@@ -25,6 +25,9 @@ unsigned int g_nPayloadSize = 0;
 bool is_undistorted = true;
 bool exit_flag = false;
 image_transport::Publisher pub;
+ros::Publisher pubCameraInfo;
+sensor_msgs::CameraInfo cam;
+int Binning = 1;
 std::string ExposureAutoStr[3] = {"Off", "Once", "Continues"};
 std::string GammaSlectorStr[3] = {"User", "sRGB", "Off"};
 
@@ -53,10 +56,6 @@ void setParams(void *handle, const std::string &params_file) {
   int GammaSlector = Params["GammaSelector"];
 
   int CenterAlign = Params["CenterAlign"];
-
-
-        int Binning = Params["Binning"];
-        printf("Binning : %d .\n", Binning);
 
   int nRet;
 
@@ -242,8 +241,8 @@ static void *WorkThread(void *pUser) {
     auto st = ros::Time::now();
     nRet =
         MV_CC_GetOneFrameTimeout(pUser, pData, nDataSize, &stImageInfo, 100);
-auto et = ros::Time::now();
-ROS_WARN_ONCE("use time : %lf", (et - st).toSec() );
+    auto et = ros::Time::now();
+    ROS_WARN_ONCE("use time : %lf", (et - st).toSec() );
 
     if (nRet == MV_OK) {
       auto time_pc_clk = std::chrono::high_resolution_clock::now();
@@ -279,7 +278,17 @@ ROS_WARN_ONCE("use time : %lf", (et - st).toSec() );
       msg->header.stamp = rcv_time;
       msg->header.frame_id = "camera";
       pub.publish(msg);
-      // ROS_WARN("camera use time : %lf", msg->header.stamp.toSec());
+
+      // pub camera_info
+      cam.header.stamp = msg->header.stamp;
+      pubCameraInfo.publish(cam);
+
+      // 写文件
+      if (stImageInfo.nFrameNum % 100 == 0 && stImageInfo.nFrameNum < 1000)
+      {
+        cv::imwrite("/home/map/pic_HK_" +std::to_string( stImageInfo.nFrameNum ) + ".png", srcImage);
+      }
+      
     }
 
     if (exit_flag)
@@ -332,7 +341,6 @@ void signal_callback_handler(int signum)
   // Terminate program
   exit_flag = true;
   exit(signum);
-
 }
 
 int main(int argc, char **argv)
@@ -340,6 +348,7 @@ int main(int argc, char **argv)
   signal(SIGINT, signal_callback_handler);
 
   ros::init(argc, argv, "mvs_trigger");
+
   std::string params_file = std::string(argv[1]);
   ros::NodeHandle nh;
   image_transport::ImageTransport it(nh);
@@ -361,12 +370,60 @@ int main(int argc, char **argv)
   // path_for_time_stamp = Params["path_for_time_stamp"];
   CameraName = camera_name;
   pub = it.advertise(pub_topic, 1);
+
+  std::cout << __FILE__ << ":" << __LINE__ << "   get camera info : START " << std::endl;
+  std::string camera_info_name = Params["Camera_info_topic_name"];
+  pubCameraInfo = nh.advertise<sensor_msgs::CameraInfo>(camera_info_name , 1);
+
+  Binning = Params["Binning"];
+  std::cout << __FILE__ << ":" << __LINE__ << " Binning: " <<  Binning << std::endl;
+
+  std::string cam_model = Params["cam_model"];
+  int cam_width = Params["cam_width"];
+  int cam_height = Params["cam_height"];
+
+  float cam_fx = Params["cam_fx"];
+  cam_fx /= Binning;
+  float cam_fy = Params["cam_fy"];
+  cam_fy /= Binning;
+  float cam_cx = Params["cam_cx"];
+  cam_cx /= Binning;
+  float cam_cy = Params["cam_cy"];
+  cam_cy /= Binning;
+  float cam_d0 = Params["cam_d0"];
+  float cam_d1 = Params["cam_d1"];
+  float cam_d2 = Params["cam_d2"];
+  float cam_d3 = Params["cam_d3"];
+
+  boost::array<double, 9> K = {
+            cam_fx, 0.000000, cam_cx,
+            0.000000, cam_fy, cam_cy,
+            0.000000, 0.000000, 1.000000};
+
+  boost::array<double, 12> P = {
+            cam_fx, 0.000000, cam_cx, 0.000000,
+            0.000000, cam_fy, cam_cy, 0.000000,
+            0.000000, 0.000000, 1.000000, 0.000000};
+  
+  std::vector<double> D {cam_d0, cam_d1, cam_d2, cam_d3, 0.000000};
+  boost::array<double, 9> r = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+  
+  cam.height = cam_height / Binning ;
+  cam.width = cam_width / Binning ;
+  cam.distortion_model = cam_model;
+  cam.D = D;
+  cam.K = K;
+  cam.P = P;
+  cam.R = r;
+  cam.binning_x = 0;
+  cam.binning_y = 0;
+  cam.header.frame_id = "camera"; // frame_id为camera，也就是相机名字
+  std::cout << __FILE__ << ":" << __LINE__ << "   get camera info : END " << std::endl;
+ 
   const char *shared_file_name = path_for_time_stamp.c_str();
-
   int fd = open(shared_file_name, O_RDWR);
+  pointt = (time_stamp *)mmap(NULL, sizeof(time_stamp), PROT_READ | PROT_WRITE,MAP_SHARED, fd, 0);
 
-  pointt = (time_stamp *)mmap(NULL, sizeof(time_stamp), PROT_READ | PROT_WRITE,
-                              MAP_SHARED, fd, 0);
   while (ros::ok()) {
     MV_CC_DEVICE_INFO_LIST stDeviceList;
     memset(&stDeviceList, 0, sizeof(MV_CC_DEVICE_INFO_LIST));
@@ -387,10 +444,8 @@ int main(int argc, char **argv)
       for (int i = 0; i < stDeviceList.nDeviceNum; i++) {
         PrintDeviceInfo(stDeviceList.pDeviceInfo[i]);
 
-        std::string serial_number =
-            std::string((char *)stDeviceList.pDeviceInfo[i]
-                            ->SpecialInfo.stUsb3VInfo.chSerialNumber);
-ROS_WARN("serial_number: %s.\n", serial_number.c_str());
+        std::string serial_number = std::string((char *)stDeviceList.pDeviceInfo[i]->SpecialInfo.stUsb3VInfo.chSerialNumber);
+        ROS_WARN("serial_number: %s.\n", serial_number.c_str());
 
        // if (expect_serial_number == serial_number) {
           find_expect_camera = true;

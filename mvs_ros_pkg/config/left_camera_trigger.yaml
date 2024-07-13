@@ -14,15 +14,16 @@ TopicName: "/hk_camera/image_color"
 # ExposureTime: 20000
 # 
 # ExposureAuto: 2  
-ExposureAuto: 2
-ExposureTime: 1000
+ExposureAuto: 1
+ExposureTime: 2000
 
 # ExposureAutoMode: 2
 # ExposureAuto: 2
 # AutoExposureTimeLower: 100
 # AutoExposureTimeUpper: 20000 #10000
 
-Binning: 4  # use 
+
+
 resize_divide: 1 # not use
 CenterAlign: 1
 # Gain Auto, 0 stands for Off, 1 stands for Once, 2 stands for Continues
@@ -36,19 +37,34 @@ GammaSelector: 1 # 0 stands for user, 1 stands for sRGB, 2
 Gamma: 0.7
 path_for_time_stamp: "/home/timeshare"
 
-
 Camera_info_topic_name: "/hk_camera_info"
 
-cam_model: Pinhole
-cam_width: 612
-cam_height: 512
+cam_model: plumb_bob
+
 
 # 平均值
-cam_fx: 625.0441867
-cam_fy: 625.8058200
-cam_cx: 302.6309133
-cam_cy: 246.7821367
-cam_d0: -0.114957667 
-cam_d1: 0.2112790000 
-cam_d2: -0.000874000 
-cam_d3: -0.001598667 
+#cam_width: 612
+#cam_height: 512
+# cam_fx: 625.0441867
+# cam_fy: 625.8058200
+# cam_cx: 302.6309133
+# cam_cy: 246.7821367
+# cam_d0: -0.114957667
+# cam_d1: 0.2112790000
+# cam_d2: -0.000874000
+# cam_d3: -0.001598667 
+
+
+Binning: 2  # 1 for 2k  ; 2 for 1080 ; 4 for 512 
+# 2k
+cam_width: 2448
+cam_height: 2048
+cam_fx: 2484.175314
+cam_fy: 2484.525290
+cam_cx: 1222.834817
+cam_cy: 987.1929620
+cam_d0: -0.09898300 
+cam_d1: 0.169520250
+cam_d2: -0.00051425
+cam_d3: -0.00025925
+
